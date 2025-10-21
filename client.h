@@ -5,7 +5,7 @@
 
 #include <winsock2.h>
 
-#elif defined (linux)
+#elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -13,6 +13,7 @@
 #include <arpa/inet.h>
 #include <unistd.h> /* close */
 #include <netdb.h> /* gethostbyname */
+#include <sys/select.h> /* select, fd_set, STDIN_FILENO */
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(s) close(s)
@@ -32,12 +33,14 @@ typedef struct in_addr IN_ADDR;
 
 #define BUF_SIZE 1024
 
-static void init(void);
-static void end(void);
-static void app(const char *address, const char *name);
-static int init_connection(const char *address);
-static void end_connection(int sock);
-static int read_server(SOCKET sock, char *buffer);
-static void write_server(SOCKET sock, const char *buffer);
+/* The client implementation has internal (static) helpers; they should not be
+ * declared in this header. This header exposes the Client type used by both
+ * client and server code. */
+
+typedef struct
+{
+   SOCKET sock;
+   char name[BUF_SIZE];
+}Client;
 
 #endif /* guard */

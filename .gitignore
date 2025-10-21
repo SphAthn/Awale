@@ -1,0 +1,20 @@
+# Ignore VS Code workspace folder
+.vscode/
+
+# Object files and compiled binaries
+*.o
+*.obj
+*.exe
+server
+client
+
+# Backup and temporary files
+*~
+*.swp
+.DS_Store
+
+# Build directories
+build/
+
+# Ignore logs
+*.log

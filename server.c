@@ -71,7 +71,7 @@ static void app(void)
       {
          /* new client */
          SOCKADDR_IN csin = { 0 };
-         size_t sinsize = sizeof csin;
+         socklen_t sinsize = sizeof csin;
          int csock = accept(sock, (SOCKADDR *)&csin, &sinsize);
          if(csock == SOCKET_ERROR)
          {

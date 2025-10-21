@@ -5,6 +5,12 @@
 
 #include "client.h"
 
+/* Forward declarations for internal static helpers (used before their definitions) */
+static int init_connection(const char *address);
+static void end_connection(int sock);
+static int read_server(SOCKET sock, char *buffer);
+static void write_server(SOCKET sock, const char *buffer);
+
 static void init(void)
 {
 #ifdef WIN32
@@ -105,7 +111,7 @@ static int init_connection(const char *address)
       exit(EXIT_FAILURE);
    }
 
-   sin.sin_addr = *(IN_ADDR *) hostinfo->h_addr;
+   sin.sin_addr = *(IN_ADDR *) hostinfo->h_addr_list[0];
    sin.sin_port = htons(PORT);
    sin.sin_family = AF_INET;
 
