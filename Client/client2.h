@@ -5,7 +5,7 @@
 
 #include <winsock2.h>
 
-#elif defined(__linux__) || defined(__unix__) || defined(__APPLE__)
+#elif defined (linux)
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -13,7 +13,6 @@
 #include <arpa/inet.h>
 #include <unistd.h> /* close */
 #include <netdb.h> /* gethostbyname */
-#include <sys/select.h> /* select, fd_set */
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
 #define closesocket(s) close(s)
