@@ -1,34 +1,45 @@
-# ---- Makefile (simple, auto-détection des .c du dossier) ----
+# ---- Makefile pour serveur / client Awale ----
 
-# Config
 CC      ?= gcc
 CSTD    ?= -std=c11
 CFLAGS  ?= -O2 -Wall -Wextra -pedantic $(CSTD)
 LDFLAGS ?=
-TARGET  ?= awale
 
-# Sources/objets (tous les .c du dossier)
-SRCS := $(wildcard *.c)
-OBJS := $(SRCS:.c=.o)
+SERVER  := server
+CLIENT  := client
 
-# Règle par défaut
-all: $(TARGET)
+# Sources explicites (on ne compile PAS game.c)
+SERVER_SRCS := server.c awale.c
+CLIENT_SRCS := client.c
 
-# Edition de liens
-$(TARGET): $(OBJS)
-	$(CC) $(OBJS) -o $@ $(LDFLAGS)
+SERVER_OBJS := $(SERVER_SRCS:.c=.o)
+CLIENT_OBJS := $(CLIENT_SRCS:.c=.o)
+
+# Règle par défaut : tout construire
+all: $(SERVER) $(CLIENT)
+
+# Link serveur
+$(SERVER): $(SERVER_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
+
+# Link client
+$(CLIENT): $(CLIENT_OBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 # Compilation de chaque .c en .o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
-# Lancement rapide
-run: $(TARGET)
-	./$(TARGET)
+# Lancer rapidement (à adapter à tes besoins)
+run-server: $(SERVER)
+	./$(SERVER)
+
+run-client: $(CLIENT)
+	./$(CLIENT)
 
 # Nettoyage
 clean:
-	$(RM) $(OBJS) $(TARGET)
+	$(RM) $(SERVER_OBJS) $(CLIENT_OBJS) $(SERVER) $(CLIENT)
 
-.PHONY: all run debug release clean
+.PHONY: all run-server run-client clean
 # ---- fin Makefile ----

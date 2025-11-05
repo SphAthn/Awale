@@ -37,10 +37,19 @@ typedef struct in_addr IN_ADDR;
  * declared in this header. This header exposes the Client type used by both
  * client and server code. */
 
-typedef struct
-{
-   SOCKET sock;
-   char name[BUF_SIZE];
-}Client;
+typedef enum {
+    STATE_FREE,        // pas en partie
+    STATE_WAITING,     // a lancé un défi, attend réponse
+    STATE_PLAYING      // en train de jouer une partie
+} ClientState;
+
+typedef struct {
+    SOCKET sock;
+    char name[BUF_SIZE];
+
+    ClientState state;
+    int game_id;       // index dans le tableau de parties, -1 si aucune
+    int pending_with;  // index du client avec qui il a une demande en cours, -1 sinon
+} Client;
 
 #endif /* guard */

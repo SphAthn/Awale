@@ -5,6 +5,7 @@
 
 #include "server.h"
 #include "client.h"
+#include "awale.h"
 
 static void init(void)
 {
@@ -33,8 +34,10 @@ static void app(void)
    /* the index for the array */
    int actual = 0;
    int max = sock;
-   /* an array for all clients */
+
+   /* Game State */
    Client clients[MAX_CLIENTS];
+   Game games[MAX_GAMES];
 
    fd_set rdfs;
 
@@ -91,7 +94,7 @@ static void app(void)
 
          FD_SET(csock, &rdfs);
 
-         Client c = { csock };
+         Client c = { csock, "", STATE_FREE, -1, -1 };
          strncpy(c.name, buffer, BUF_SIZE - 1);
          clients[actual] = c;
          actual++;
@@ -107,17 +110,14 @@ static void app(void)
                Client client = clients[i];
                int c = read_client(clients[i].sock, buffer);
                /* client disconnected */
-               if(c == 0)
-               {
+               if(c == 0) {
                   closesocket(clients[i].sock);
                   remove_client(clients, i, &actual);
                   strncpy(buffer, client.name, BUF_SIZE - 1);
                   strncat(buffer, " disconnected !", BUF_SIZE - strlen(buffer) - 1);
                   send_message_to_all_clients(clients, client, actual, buffer, 1);
-               }
-               else
-               {
-                  send_message_to_all_clients(clients, client, actual, buffer, 0);
+               } else {
+                  handle_client_message(clients, i, actual, buffer);
                }
                break;
             }
@@ -127,6 +127,72 @@ static void app(void)
 
    clear_clients(clients, actual);
    end_connection(sock);
+}
+
+static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
+{
+    Client *c = &clients[idx];
+
+    if (strncmp(buffer, "/list", 5) == 0) {
+        send_user_list(clients, idx, actual);
+    } else if (strncmp(buffer, "/challenge ", 11) == 0) {
+        handle_challenge(clients, idx, actual, buffer + 11);
+    } else if (strncmp(buffer, "/accept ", 8) == 0) {
+        handle_accept(clients, idx, actual, buffer + 8);
+    } else if (strncmp(buffer, "/refuse ", 8) == 0) {
+        handle_refuse(clients, idx, actual, buffer + 8);
+    } else if (strncmp(buffer, "/move ", 6) == 0) {
+        handle_move(clients, idx, buffer + 6);
+    } else {
+        // chat : pour l’instant, re-use votre broadcast
+        send_message_to_all_clients(clients, *c, actual, buffer, 0);
+    }
+}
+
+static void send_user_list(Client *clients, int idx, int actual)
+{
+    char msg[BUF_SIZE];
+    msg[0] = '\0';
+    strcat(msg, "Users online:\n");
+    for (int i = 0; i < actual; i++) {
+        strcat(msg, "- ");
+        strcat(msg, clients[i].name);
+        strcat(msg, "\n");
+    }
+    write_client(clients[idx].sock, msg);
+}
+
+/* Minimal stub implementations for game-related handlers.
+ * These currently just notify the requesting client that the command
+ * is not yet implemented. They are defined with external linkage to
+ * match the prototypes in server.h so the program links cleanly.
+ */
+void handle_challenge(Client *clients, int idx, int actual, const char *target_name)
+{
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof msg, "Challenge '%s' not implemented yet" CRLF, target_name);
+   write_client(clients[idx].sock, msg);
+}
+
+void handle_accept(Client *clients, int idx, int actual, const char *from_name)
+{
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof msg, "Accept from '%s' not implemented yet" CRLF, from_name);
+   write_client(clients[idx].sock, msg);
+}
+
+void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
+{
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof msg, "Refuse from '%s' not implemented yet" CRLF, from_name);
+   write_client(clients[idx].sock, msg);
+}
+
+void handle_move(Client *clients, int idx, const char *move_args)
+{
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof msg, "Move '%s' not implemented yet" CRLF, move_args);
+   write_client(clients[idx].sock, msg);
 }
 
 static void clear_clients(Client *clients, int actual)

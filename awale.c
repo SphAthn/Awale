@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "awale.h"
 
 void initialiser_jeu(Awale *jeu) {
@@ -90,4 +91,23 @@ void verifier_statut(Awale *jeu) {
     else if (jeu->captures[PLAYER_SOUTH] == 24 &&
              jeu->captures[PLAYER_NORTH] == 24)
         jeu->statut = NUL;
+}
+
+void awale_format_board(const Awale *jeu, char *out, size_t out_size) {
+    char tmp[256];
+    out[0] = '\0';
+
+    strcat(out, "Nord: ");
+    for (int i = 11; i >= 6; i--) {
+        snprintf(tmp, sizeof(tmp), "%2d ", jeu->plateau[i]);
+        strncat(out, tmp, out_size - strlen(out) - 1);
+    }
+    strncat(out, "\nSud : ", out_size - strlen(out) - 1);
+    for (int i = 0; i <= 5; i++) {
+        snprintf(tmp, sizeof(tmp), "%2d ", jeu->plateau[i]);
+        strncat(out, tmp, out_size - strlen(out) - 1);
+    }
+    snprintf(tmp, sizeof(tmp), "\nCaptures: Sud=%d | Nord=%d\n",
+             jeu->captures[PLAYER_SOUTH], jeu->captures[PLAYER_NORTH]);
+    strncat(out, tmp, out_size - strlen(out) - 1);
 }

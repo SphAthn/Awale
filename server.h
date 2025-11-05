@@ -30,9 +30,10 @@ typedef struct in_addr IN_ADDR;
 
 #define CRLF        "\r\n"
 #define PORT         1977
-#define MAX_CLIENTS     100
+#define MAX_CLIENTS  100
+#define MAX_GAMES    32
 
-#define BUF_SIZE    1024
+#define BUF_SIZE     1024
 
 #include "client.h"
 
@@ -46,5 +47,17 @@ static void write_client(SOCKET sock, const char *buffer);
 static void send_message_to_all_clients(Client *clients, Client client, int actual, const char *buffer, char from_server);
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
+
+/* Forward declarations for helpers defined later in server.c (static) */
+static void handle_client_message(Client *clients, int idx, int actual, char *buffer);
+static void send_user_list(Client *clients, int idx, int actual);
+
+/* Handlers that may be implemented elsewhere (non-static / external) */
+void handle_challenge(Client *clients, int idx, int actual, const char *target_name);
+void handle_accept(Client *clients, int idx, int actual, const char *from_name);
+void handle_refuse(Client *clients, int idx, int actual, const char *from_name);
+void handle_move(Client *clients, int idx, const char *move_args);
+
+
 
 #endif /* guard */
