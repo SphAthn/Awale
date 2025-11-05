@@ -7,6 +7,8 @@
 #include "client.h"
 #include "awale.h"
 
+static Game games[MAX_GAMES];
+
 static void init(void)
 {
 #ifdef WIN32
@@ -31,13 +33,13 @@ static void app(void)
 {
    SOCKET sock = init_connection();
    char buffer[BUF_SIZE];
-   /* the index for the array */
    int actual = 0;
    int max = sock;
 
-   /* Game State */
    Client clients[MAX_CLIENTS];
-   Game games[MAX_GAMES];
+   for (int g = 0; g < MAX_GAMES; ++g) {
+      games[g].used = 0;
+   }
 
    fd_set rdfs;
 
@@ -129,6 +131,23 @@ static void app(void)
    end_connection(sock);
 }
 
+/* Helpers */
+static void trim_newline(char *s)
+{
+    size_t len = strlen(s);
+    while (len > 0 && (s[len-1] == '\n' || s[len-1] == '\r')) {
+        s[--len] = '\0';
+    }
+}
+
+static int find_client_by_name(Client *clients, int actual, const char *name)
+{
+    for (int i = 0; i < actual; i++) {
+        if (strcmp(clients[i].name, name) == 0) return i;
+    }
+    return -1;
+}
+
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
 {
     Client *c = &clients[idx];
@@ -168,14 +187,6 @@ static void send_user_list(Client *clients, int idx, int actual)
     write_client(clients[idx].sock, msg);
 }
 
-static int find_client_by_name(Client *clients, int actual, const char *name)
-{
-    for (int i = 0; i < actual; i++) {
-        if (strcmp(clients[i].name, name) == 0) return i;
-    }
-    return -1;
-}
-
 static void handle_challenge(Client *clients, int idx, int actual, const char *target_name)
 {
     int j = find_client_by_name(clients, actual, target_name);
@@ -200,18 +211,96 @@ static void handle_challenge(Client *clients, int idx, int actual, const char *t
     write_client(clients[idx].sock, "Challenge sent.\n");
 }
 
+static int create_game(Game *games, int max_games, int idxA, int idxB)
+{
+    for (int g = 0; g < max_games; g++) {
+        if (!games[g].used) {
+            games[g].used = 1;
+            initialiser_jeu(&games[g].awale);
+
+            // random qui est South/North
+            int r = rand() % 2;
+            if (r == 0) {
+                games[g].player_south = idxA;
+                games[g].player_north = idxB;
+            } else {
+                games[g].player_south = idxB;
+                games[g].player_north = idxA;
+            }
+            return g;
+        }
+    }
+    return -1; // plus de place
+}
+
+void handle_accept(Client *clients, int idx, int actual, const char *challenger_name)
+{
+    char name[BUF_SIZE];
+
+    /* On copie le nom reçu et on enlève les \r\n éventuels */
+    strncpy(name, challenger_name, BUF_SIZE - 1);
+    name[BUF_SIZE - 1] = '\0';
+    trim_newline(name);
+
+    int j = find_client_by_name(clients, actual, name);
+    if (j == -1) {
+        write_client(clients[idx].sock, "Unknown user." CRLF);
+        return;
+    }
+
+    /* Vérifier qu'il y a bien un défi en cours entre idx et j */
+    if (clients[idx].pending_with != j || clients[j].pending_with != idx) {
+        write_client(clients[idx].sock, "No pending challenge with this user." CRLF);
+        return;
+    }
+
+    /* Créer la partie */
+    int game_id = create_game(games, MAX_GAMES, idx, j);
+    if (game_id < 0) {
+        write_client(clients[idx].sock, "Cannot create game (server full)." CRLF);
+        write_client(clients[j].sock,   "Cannot create game (server full)." CRLF);
+        clients[idx].pending_with = -1;
+        clients[j].pending_with = -1;
+        clients[idx].state = STATE_FREE;
+        clients[j].state = STATE_FREE;
+        return;
+    }
+
+    clients[idx].state     = STATE_PLAYING;
+    clients[idx].game_id   = game_id;
+    clients[j].state       = STATE_PLAYING;
+    clients[j].game_id     = game_id;
+    clients[idx].pending_with = -1;
+    clients[j].pending_with = -1;
+
+    char msg[BUF_SIZE];
+
+    /* Annonce de la partie */
+    snprintf(msg, sizeof msg,
+             "Game %d created between %s and %s" CRLF,
+             game_id, clients[idx].name, clients[j].name);
+    write_client(clients[idx].sock, msg);
+    write_client(clients[j].sock, msg);
+
+    /* Dire à chacun s’il est South ou North et qui commence */
+    if (games[game_id].player_south == idx) {
+        write_client(clients[idx].sock, "You are South, you start." CRLF);
+        write_client(clients[j].sock,   "You are North, you play second." CRLF);
+    } else {
+        write_client(clients[j].sock,   "You are South, you start." CRLF);
+        write_client(clients[idx].sock, "You are North, you play second." CRLF);
+    }
+
+   awale_format_board(&games[game_id].awale, msg, sizeof msg);
+   write_client(clients[idx].sock, msg);
+   write_client(clients[j].sock, msg);
+}
+
 /* Minimal stub implementations for game-related handlers.
  * These currently just notify the requesting client that the command
  * is not yet implemented. They are defined with external linkage to
  * match the prototypes in server.h so the program links cleanly.
  */
-void handle_accept(Client *clients, int idx, int actual, const char *from_name)
-{
-   char msg[BUF_SIZE];
-   snprintf(msg, sizeof msg, "Accept from '%s' not implemented yet" CRLF, from_name);
-   write_client(clients[idx].sock, msg);
-}
-
 void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
 {
    char msg[BUF_SIZE];
