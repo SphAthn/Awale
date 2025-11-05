@@ -210,12 +210,20 @@ static void send_user_list(Client *clients, int idx, int actual)
 static void handle_challenge(Client *clients, int idx, int actual, const char *target_name)
 {
     int j = find_client_by_name(clients, actual, target_name);
+    if (clients[idx].state != STATE_FREE) {
+        write_client(clients[idx].sock, "You cannot issue a challenge while not free.\n");
+        return;
+    }
     if (j == -1) {
         write_client(clients[idx].sock, "Unknown user.\n");
         return;
     }
     if (idx == j) {
         write_client(clients[idx].sock, "You cannot challenge yourself.\n");
+        return;
+    }
+    if (clients[j].state != STATE_FREE) {
+        write_client(clients[idx].sock, "User is not available for a challenge.\n");
         return;
     }
 
