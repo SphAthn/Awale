@@ -132,6 +132,11 @@ static void app(void)
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
 {
     Client *c = &clients[idx];
+    if (buffer[0] != '/') {
+        // Not a command, treat as chat
+        send_message_to_all_clients(clients, *c, actual, buffer, 0);
+        return;
+    }
 
     if (strncmp(buffer, "/list", 5) == 0) {
         send_user_list(clients, idx, actual);
@@ -144,8 +149,9 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
     } else if (strncmp(buffer, "/move ", 6) == 0) {
         handle_move(clients, idx, buffer + 6);
     } else {
-        // chat : pour l’instant, re-use votre broadcast
-        send_message_to_all_clients(clients, *c, actual, buffer, 0);
+         char msg[BUF_SIZE];
+         snprintf(msg, sizeof msg, "Unknown command: '%s'" CRLF, buffer);
+         write_client(c->sock, msg);
     }
 }
 
