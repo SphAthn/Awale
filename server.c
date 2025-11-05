@@ -190,12 +190,19 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
 static void send_user_list(Client *clients, int idx, int actual)
 {
     char msg[BUF_SIZE];
+    char line[BUF_SIZE];
     msg[0] = '\0';
     strcat(msg, "Users online:\n");
     for (int i = 0; i < actual; i++) {
-        strcat(msg, "- ");
-        strcat(msg, clients[i].name);
-        strcat(msg, "\n");
+        const char *state_str;
+        switch (clients[i].state) {
+            case STATE_FREE:    state_str = "free"; break;
+            case STATE_WAITING: state_str = "waiting"; break;
+            case STATE_PLAYING: state_str = "playing"; break;
+            default:            state_str = "unknown"; break;
+        }
+        snprintf(line, sizeof(line), "- %s (%s)\n", clients[i].name, state_str);
+        strcat(msg, line);
     }
     write_client(clients[idx].sock, msg);
 }
