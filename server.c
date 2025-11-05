@@ -343,17 +343,77 @@ void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
    clients[j].state = STATE_FREE;
 }
 
-/* Minimal stub implementations for game-related handlers.
- * These currently just notify the requesting client that the command
- * is not yet implemented. They are defined with external linkage to
- * match the prototypes in server.h so the program links cleanly.
- */
-
-void handle_move(Client *clients, int idx, const char *move_args)
+static void handle_move(Client *clients, int idx, const char *arg)
 {
-   char msg[BUF_SIZE];
-   snprintf(msg, sizeof msg, "Move '%s' not implemented yet" CRLF, move_args);
-   write_client(clients[idx].sock, msg);
+    int pit = atoi(arg);
+    Client *c = &clients[idx];
+
+    if (c->state != STATE_PLAYING || c->game_id < 0) {
+        write_client(c->sock, "You are not in a game.\n");
+        return;
+    }
+
+    Game *g = &games[c->game_id];
+
+    // déterminer si idx est South ou North
+    int player_role;
+    if (g->player_south == idx) player_role = PLAYER_SOUTH;
+    else if (g->player_north == idx) player_role = PLAYER_NORTH;
+    else {
+        write_client(c->sock, "You are not a player in this game.\n");
+        return;
+    }
+
+    // vérifier que c'est son tour
+    if (g->awale.tour_de != player_role) {
+        write_client(c->sock, "Not your turn.\n");
+        return;
+    }
+
+    if (!coup_valide(&g->awale, pit)) {
+        write_client(c->sock, "Invalid move.\n");
+        return;
+    }
+
+    jouer_coup(&g->awale, pit);
+    verifier_statut(&g->awale);
+
+    // envoyer le plateau à tout le monde
+    char board[BUF_SIZE];
+    awale_format_board(&g->awale, board, sizeof(board));
+    write_client(clients[g->player_south].sock, board);
+    write_client(clients[g->player_north].sock, board);
+
+    if (g->awale.statut != EN_COURS) {
+        // annoncer le résultat, libérer la partie
+        char msg[BUF_SIZE];
+        if (g->awale.statut == SUD_GAGNE) {
+            snprintf(msg, sizeof(msg), "Game over. South wins.\n");
+        } else if (g->awale.statut == NORD_GAGNE) {
+            snprintf(msg, sizeof(msg), "Game over. North wins.\n");
+        } else {
+            snprintf(msg, sizeof(msg), "Game over. Draw.\n");
+        }
+        write_client(clients[g->player_south].sock, msg);
+        write_client(clients[g->player_north].sock, msg);
+
+        // remettre les états clients
+        clients[g->player_south].state = STATE_FREE;
+        clients[g->player_south].game_id = -1;
+        clients[g->player_north].state = STATE_FREE;
+        clients[g->player_north].game_id = -1;
+
+        g->used = 0; // slot libéré
+    } else {
+        // indiquer de qui est le tour
+        char turn_msg[64];
+        const char *who = (g->awale.tour_de == PLAYER_SOUTH)
+                          ? clients[g->player_south].name
+                          : clients[g->player_north].name;
+        snprintf(turn_msg, sizeof(turn_msg), "Turn: %s\n", who);
+        write_client(clients[g->player_south].sock, turn_msg);
+        write_client(clients[g->player_north].sock, turn_msg);
+    }
 }
 
 static void clear_clients(Client *clients, int actual)
