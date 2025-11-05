@@ -162,18 +162,43 @@ static void send_user_list(Client *clients, int idx, int actual)
     write_client(clients[idx].sock, msg);
 }
 
+static int find_client_by_name(Client *clients, int actual, const char *name)
+{
+    for (int i = 0; i < actual; i++) {
+        if (strcmp(clients[i].name, name) == 0) return i;
+    }
+    return -1;
+}
+
+static void handle_challenge(Client *clients, int idx, int actual, const char *target_name)
+{
+    int j = find_client_by_name(clients, actual, target_name);
+    if (j == -1) {
+        write_client(clients[idx].sock, "Unknown user.\n");
+        return;
+    }
+    if (idx == j) {
+        write_client(clients[idx].sock, "You cannot challenge yourself.\n");
+        return;
+    }
+
+    clients[idx].state = STATE_WAITING;
+    clients[idx].pending_with = j;
+    clients[j].pending_with = idx;
+
+    char msg[BUF_SIZE];
+    snprintf(msg, sizeof(msg), "%s challenged you. Type /accept %s or /refuse %s\n",
+             clients[idx].name, clients[idx].name, clients[idx].name);
+    write_client(clients[j].sock, msg);
+
+    write_client(clients[idx].sock, "Challenge sent.\n");
+}
+
 /* Minimal stub implementations for game-related handlers.
  * These currently just notify the requesting client that the command
  * is not yet implemented. They are defined with external linkage to
  * match the prototypes in server.h so the program links cleanly.
  */
-void handle_challenge(Client *clients, int idx, int actual, const char *target_name)
-{
-   char msg[BUF_SIZE];
-   snprintf(msg, sizeof msg, "Challenge '%s' not implemented yet" CRLF, target_name);
-   write_client(clients[idx].sock, msg);
-}
-
 void handle_accept(Client *clients, int idx, int actual, const char *from_name)
 {
    char msg[BUF_SIZE];
