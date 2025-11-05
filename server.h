@@ -52,10 +52,9 @@ static void clear_clients(Client *clients, int actual);
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer);
 static void send_user_list(Client *clients, int idx, int actual);
 static void handle_challenge(Client *clients, int idx, int actual, const char *target_name);
-
-/* Not implemented yet */
 static void handle_accept(Client *clients, int idx, int actual, const char *from_name);
 static void handle_refuse(Client *clients, int idx, int actual, const char *from_name);
 static void handle_move(Client *clients, int idx, const char *move_args);
+static void handle_games(Client *clients, int idx);
 
 #endif /* guard */

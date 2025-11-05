@@ -160,6 +160,8 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
 
     if (strncmp(buffer, "/list", 5) == 0) {
         send_user_list(clients, idx, actual);
+    } else if (strncmp(buffer, "/games", 6) == 0) {
+        handle_games(clients, idx);
     } else if (strncmp(buffer, "/challenge ", 11) == 0) {
         handle_challenge(clients, idx, actual, buffer + 11);
     } else if (strncmp(buffer, "/accept ", 8) == 0) {
@@ -173,6 +175,7 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
         snprintf(msg, sizeof msg,
             "Available commands:" CRLF
             "/list              - Show connected users" CRLF
+            "/games             - List active games" CRLF
             "/challenge <user>  - Challenge another player" CRLF
             "/accept <user>     - Accept a challenge" CRLF
             "/refuse <user>     - Refuse a challenge" CRLF
@@ -186,6 +189,27 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
     }
 }
 
+static void handle_games(Client *clients, int idx)
+{
+    char msg[BUF_SIZE];
+    msg[0] = '\0';
+    strcat(msg, "Active games:\n");
+    int found = 0;
+    for (int g = 0; g < MAX_GAMES; g++) {
+        if (games[g].used) {
+            found = 1;
+            const char *south_name = clients[games[g].player_south].name;
+            const char *north_name = clients[games[g].player_north].name;
+            char line[BUF_SIZE];
+            snprintf(line, sizeof(line), "- Game %d: South=%s vs North=%s\n", g, south_name, north_name);
+            strcat(msg, line);
+        }
+    }
+    if (!found) {
+        strcat(msg, "No active games.\n");
+    }
+    write_client(clients[idx].sock, msg);
+}
 
 static void send_user_list(Client *clients, int idx, int actual)
 {
