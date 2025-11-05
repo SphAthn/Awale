@@ -151,6 +151,7 @@ static int find_client_by_name(Client *clients, int actual, const char *name)
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
 {
     Client *c = &clients[idx];
+
     if (buffer[0] != '/') {
         // Not a command, treat as chat
         send_message_to_all_clients(clients, *c, actual, buffer, 0);
@@ -167,12 +168,24 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
         handle_refuse(clients, idx, actual, buffer + 8);
     } else if (strncmp(buffer, "/move ", 6) == 0) {
         handle_move(clients, idx, buffer + 6);
+    } else if (strncmp(buffer, "/help", 5) == 0) {
+        char msg[BUF_SIZE];
+        snprintf(msg, sizeof msg,
+            "Available commands:" CRLF
+            "/list              - Show connected users" CRLF
+            "/challenge <user>  - Challenge another player" CRLF
+            "/accept <user>     - Accept a challenge" CRLF
+            "/refuse <user>     - Refuse a challenge" CRLF
+            "/move <n>          - Play a move (depending on the game)" CRLF
+            "/help              - Show this help message" CRLF);
+        write_client(c->sock, msg);
     } else {
-         char msg[BUF_SIZE];
-         snprintf(msg, sizeof msg, "Unknown command: '%s'" CRLF, buffer);
-         write_client(c->sock, msg);
+        char msg[BUF_SIZE];
+        snprintf(msg, sizeof msg, "Unknown command: '%s'" CRLF "Type /help for available commands." CRLF, buffer);
+        write_client(c->sock, msg);
     }
 }
+
 
 static void send_user_list(Client *clients, int idx, int actual)
 {
