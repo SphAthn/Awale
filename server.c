@@ -248,65 +248,99 @@ static int create_game(Game *games, int max_games, int idxA, int idxB)
 
 void handle_accept(Client *clients, int idx, int actual, const char *challenger_name)
 {
-    char name[BUF_SIZE];
+   char name[BUF_SIZE];
 
-    /* On copie le nom reçu et on enlève les \r\n éventuels */
-    strncpy(name, challenger_name, BUF_SIZE - 1);
-    name[BUF_SIZE - 1] = '\0';
-    trim_newline(name);
+   /* On copie le nom reçu et on enlève les \r\n éventuels */
+   strncpy(name, challenger_name, BUF_SIZE - 1);
+   name[BUF_SIZE - 1] = '\0';
+   trim_newline(name);
 
-    int j = find_client_by_name(clients, actual, name);
-    if (j == -1) {
-        write_client(clients[idx].sock, "Unknown user." CRLF);
-        return;
-    }
+   int j = find_client_by_name(clients, actual, name);
+   if (j == -1) {
+      write_client(clients[idx].sock, "Unknown user." CRLF);
+      return;
+   }
 
-    /* Vérifier qu'il y a bien un défi en cours entre idx et j */
-    if (clients[idx].pending_with != j || clients[j].pending_with != idx) {
-        write_client(clients[idx].sock, "No pending challenge with this user." CRLF);
-        return;
-    }
+   /* Vérifier qu'il y a bien un défi en cours entre idx et j */
+   if (clients[idx].pending_with != j || clients[j].pending_with != idx) {
+      write_client(clients[idx].sock, "No pending challenge with this user." CRLF);
+      return;
+   }
 
-    /* Créer la partie */
-    int game_id = create_game(games, MAX_GAMES, idx, j);
-    if (game_id < 0) {
-        write_client(clients[idx].sock, "Cannot create game (server full)." CRLF);
-        write_client(clients[j].sock,   "Cannot create game (server full)." CRLF);
-        clients[idx].pending_with = -1;
-        clients[j].pending_with = -1;
-        clients[idx].state = STATE_FREE;
-        clients[j].state = STATE_FREE;
-        return;
-    }
+   /* Créer la partie */
+   int game_id = create_game(games, MAX_GAMES, idx, j);
+   if (game_id < 0) {
+      write_client(clients[idx].sock, "Cannot create game (server full)." CRLF);
+      write_client(clients[j].sock,   "Cannot create game (server full)." CRLF);
+      clients[idx].pending_with = -1;
+      clients[j].pending_with = -1;
+      clients[idx].state = STATE_FREE;
+      clients[j].state = STATE_FREE;
+      return;
+   }
 
-    clients[idx].state     = STATE_PLAYING;
-    clients[idx].game_id   = game_id;
-    clients[j].state       = STATE_PLAYING;
-    clients[j].game_id     = game_id;
-    clients[idx].pending_with = -1;
-    clients[j].pending_with = -1;
+   clients[idx].state     = STATE_PLAYING;
+   clients[idx].game_id   = game_id;
+   clients[j].state       = STATE_PLAYING;
+   clients[j].game_id     = game_id;
+   clients[idx].pending_with = -1;
+   clients[j].pending_with = -1;
 
-    char msg[BUF_SIZE];
+   char msg[BUF_SIZE];
 
-    /* Annonce de la partie */
-    snprintf(msg, sizeof msg,
-             "Game %d created between %s and %s" CRLF,
-             game_id, clients[idx].name, clients[j].name);
-    write_client(clients[idx].sock, msg);
-    write_client(clients[j].sock, msg);
+   /* Annonce de la partie */
+   snprintf(msg, sizeof msg,
+            "Game %d created between %s and %s" CRLF,
+            game_id, clients[idx].name, clients[j].name);
+   write_client(clients[idx].sock, msg);
+   write_client(clients[j].sock, msg);
 
-    /* Dire à chacun s’il est South ou North et qui commence */
-    if (games[game_id].player_south == idx) {
-        write_client(clients[idx].sock, "You are South, you start." CRLF);
-        write_client(clients[j].sock,   "You are North, you play second." CRLF);
-    } else {
-        write_client(clients[j].sock,   "You are South, you start." CRLF);
-        write_client(clients[idx].sock, "You are North, you play second." CRLF);
-    }
+   /* Dire à chacun s’il est South ou North et qui commence */
+   if (games[game_id].player_south == idx) {
+      write_client(clients[idx].sock, "You are South, you start." CRLF);
+      write_client(clients[j].sock,   "You are North, you play second." CRLF);
+   } else {
+      write_client(clients[j].sock,   "You are South, you start." CRLF);
+      write_client(clients[idx].sock, "You are North, you play second." CRLF);
+   }
 
    awale_format_board(&games[game_id].awale, msg, sizeof msg);
    write_client(clients[idx].sock, msg);
    write_client(clients[j].sock, msg);
+}
+
+void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
+{
+   char name[BUF_SIZE];
+
+   /* On copie le nom reçu et on enlève les \r\n éventuels */
+   strncpy(name, from_name, BUF_SIZE - 1);
+   name[BUF_SIZE - 1] = '\0';
+   trim_newline(name);
+
+   int j = find_client_by_name(clients, actual, name);
+   if (j == -1) {
+      write_client(clients[idx].sock, "Unknown user." CRLF);
+      return;
+   }
+
+   /* Vérifier qu'il y a bien un défi en cours entre idx et j */
+   if (clients[idx].pending_with != j || clients[j].pending_with != idx) {
+      write_client(clients[idx].sock, "No pending challenge with this user." CRLF);
+      return;
+   }
+
+   /* Notifier le challenger */
+   char msg[BUF_SIZE];
+   snprintf(msg, sizeof msg, "%s refused your challenge." CRLF, clients[idx].name);
+   write_client(clients[j].sock, msg);
+   write_client(clients[idx].sock, "Challenge refused." CRLF);
+
+   /* Réinitialiser les états */
+   clients[idx].pending_with = -1;
+   clients[j].pending_with = -1;
+   clients[idx].state = STATE_FREE;
+   clients[j].state = STATE_FREE;
 }
 
 /* Minimal stub implementations for game-related handlers.
@@ -314,12 +348,6 @@ void handle_accept(Client *clients, int idx, int actual, const char *challenger_
  * is not yet implemented. They are defined with external linkage to
  * match the prototypes in server.h so the program links cleanly.
  */
-void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
-{
-   char msg[BUF_SIZE];
-   snprintf(msg, sizeof msg, "Refuse from '%s' not implemented yet" CRLF, from_name);
-   write_client(clients[idx].sock, msg);
-}
 
 void handle_move(Client *clients, int idx, const char *move_args)
 {
