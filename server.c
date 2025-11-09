@@ -8,6 +8,9 @@
 #include "awale.h"
 
 static Game games[MAX_GAMES];
+PlayerStats stats[MAX_STATS];
+int stats_count = 0;
+
 
 static void init(void)
 {
@@ -24,6 +27,7 @@ static void init(void)
 
 static void end(void)
 {
+   save_stats("stats.txt");
 #ifdef WIN32
    WSACleanup();
 #endif
@@ -35,6 +39,7 @@ static void app(void)
    char buffer[BUF_SIZE];
    int actual = 0;
    int max = sock;
+   load_stats("stats.txt");
 
    Client clients[MAX_CLIENTS];
    for (int g = 0; g < MAX_GAMES; ++g) {
@@ -143,6 +148,80 @@ static void app(void)
 }
 
 /* Helpers */
+void load_stats(const char *filename) {
+    FILE *f = fopen(filename, "r");
+    if (!f) return; // fichier inexistant → stats vides
+
+    stats_count = 0;
+    while (fscanf(f, "%s %d %d %d %d",
+                  stats[stats_count].name,
+                  &stats[stats_count].games_played,
+                  &stats[stats_count].wins,
+                  &stats[stats_count].draws,
+                  &stats[stats_count].losses) == 5) {
+        stats_count++;
+        if (stats_count >= MAX_STATS) break;
+    }
+    fclose(f);
+}
+
+void save_stats(const char *filename) {
+    FILE *f = fopen(filename, "w");
+    if (!f) return;
+
+    for (int i = 0; i < stats_count; i++) {
+        fprintf(f, "%s %d %d %d %d\n",
+                stats[i].name,
+                stats[i].games_played,
+                stats[i].wins,
+                stats[i].draws,
+                stats[i].losses);
+    }
+    fclose(f);
+}
+
+void update_stats(const char *south, const char *north, int result) {
+    // result : 0 = draw, 1 = south wins, 2 = north wins
+    PlayerStats *p_s = NULL;
+    PlayerStats *p_n = NULL;
+
+    // Chercher ou créer les joueurs
+    for (int i = 0; i < stats_count; i++) {
+        if (strcmp(stats[i].name, south) == 0) p_s = &stats[i];
+        if (strcmp(stats[i].name, north) == 0) p_n = &stats[i];
+    }
+
+    if (!p_s && stats_count < MAX_STATS) {
+        p_s = &stats[stats_count++];
+        strncpy(p_s->name, south, BUF_SIZE - 1);
+        p_s->games_played = 0; p_s->wins = 0; p_s->draws = 0; p_s->losses = 0;
+    }
+    if (!p_n && stats_count < MAX_STATS) {
+        p_n = &stats[stats_count++];
+        strncpy(p_n->name, north, BUF_SIZE - 1);
+        p_n->games_played = 0; p_n->wins = 0; p_n->draws = 0; p_n->losses = 0;
+    }
+
+    // Incrémenter les stats
+    p_s->games_played++;
+    p_n->games_played++;
+
+    if (result == 0) { // égalité
+        p_s->draws++;
+        p_n->draws++;
+    } else if (result == 1) { // sud gagne
+        p_s->wins++;
+        p_n->losses++;
+    } else if (result == 2) { // nord gagne
+        p_n->wins++;
+        p_s->losses++;
+    }
+
+    // Sauvegarder
+    save_stats("stats.txt");
+}
+
+
 static void trim_newline(char *s)
 {
     size_t len = strlen(s);
@@ -181,6 +260,8 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
         handle_refuse(clients, idx, actual, buffer + 8);
     } else if (strncmp(buffer, "/move ", 6) == 0) {
         handle_move(clients, idx, buffer + 6);
+    } else if (strncmp(buffer, "/stats", 6) == 0) {
+        handle_stats(clients);
     } else if (strncmp(buffer, "/help", 5) == 0) {
         char msg[BUF_SIZE];
         snprintf(msg, sizeof msg,
@@ -198,6 +279,58 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
         snprintf(msg, sizeof msg, "Unknown command: '%s'" CRLF "Type /help for available commands." CRLF, buffer);
         write_client(c->sock, msg);
     }
+}
+
+
+void handle_stats(Client *c) {
+    char msg[BUF_SIZE];
+    msg[0] = '\0';
+
+    // 1. Stats du joueur connecté
+    PlayerStats *p = NULL;
+    for (int i = 0; i < stats_count; i++) {
+        if (strcmp(stats[i].name, c->name) == 0) {
+            p = &stats[i];
+            break;
+        }
+    }
+
+    if (p) {
+        char line[128];
+        snprintf(line, sizeof(line),
+                 "Your stats: %d games, %d wins, %d draws, %d losses\n",
+                 p->games_played, p->wins, p->draws, p->losses);
+        strncat(msg, line, BUF_SIZE - strlen(msg) - 1);
+    } else {
+        strcat(msg, "You have no recorded stats yet.\n");
+    }
+
+    // 2. Top 10 players par nombre de victoires
+    // Copier les stats pour trier sans modifier l'original
+    PlayerStats top[stats_count];
+    memcpy(top, stats, stats_count * sizeof(PlayerStats));
+
+    // Tri simple (bubble sort ou qsort)
+    for (int i = 0; i < stats_count - 1; i++) {
+        for (int j = i + 1; j < stats_count; j++) {
+            if (top[j].wins > top[i].wins) {
+                PlayerStats tmp = top[i];
+                top[i] = top[j];
+                top[j] = tmp;
+            }
+        }
+    }
+
+    strcat(msg, "\nTop players:\n");
+    int limit = stats_count < 10 ? stats_count : 10;
+    for (int i = 0; i < limit; i++) {
+        char line[128];
+        snprintf(line, sizeof(line), "%d. %s: %d wins (%d games)\n",
+                 i + 1, top[i].name, top[i].wins, top[i].games_played);
+        strncat(msg, line, BUF_SIZE - strlen(msg) - 1);
+    }
+
+    write_client(c->sock, msg);
 }
 
 static void handle_games(Client *clients, int idx)
@@ -472,6 +605,12 @@ static void handle_move(Client *clients, int idx, const char *arg)
 
         write_client(clients[g->player_south].sock, endmsg);
         write_client(clients[g->player_north].sock, endmsg);
+        
+        // mise à jour des statistiques en fin de partie
+        int result = 0;
+        if (jeu->statut == SUD_GAGNE) result = 1;
+        else if (jeu->statut == NORD_GAGNE) result = 2;
+        update_stats(clients[g->player_south].name, clients[g->player_north].name, result);
 
         // remettre les états clients
         clients[g->player_south].state = STATE_FREE;

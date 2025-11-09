@@ -22,6 +22,7 @@ typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr SOCKADDR;
 typedef struct in_addr IN_ADDR;
 
+
 #else
 
 #error not defined for this platform
@@ -34,8 +35,17 @@ typedef struct in_addr IN_ADDR;
 #define MAX_GAMES    32
 
 #define BUF_SIZE     1024
+#define MAX_STATS    100   // maximum number of players with stats
 
 #include "client.h"
+
+typedef struct {
+    char name[BUF_SIZE];
+    int games_played;
+    int wins;
+    int draws;
+    int losses;
+} PlayerStats;
 
 static void init(void);
 static void end(void);
