@@ -238,6 +238,40 @@ static int find_client_by_name(Client *clients, int actual, const char *name)
     return -1;
 }
 
+static void handle_resign(Client *clients, int idx)
+{
+    Client *c = &clients[idx];
+
+    if (c->state != STATE_PLAYING || c->game_id < 0) {
+        write_client(c->sock, "You are not in a game.\n");
+        return;
+    }
+
+    Game *g = &games[c->game_id];
+    int opponent_idx = (g->player_south == idx) ? g->player_north : g->player_south;
+
+    char msg[BUF_SIZE];
+    snprintf(msg, sizeof msg, "%s resigned. You win!\n", c->name);
+    write_client(clients[opponent_idx].sock, msg);
+    write_client(c->sock, "You resigned. Game over.\n");
+
+    // mettre à jour les stats
+    int result = (g->player_south == idx) ? 2 : 1; // l’autre gagne
+    update_stats(clients[g->player_south].name,
+                 clients[g->player_north].name,
+                 result);
+
+    // remettre les états des joueurs
+    clients[g->player_south].state = STATE_FREE;
+    clients[g->player_south].game_id = -1;
+    clients[g->player_north].state = STATE_FREE;
+    clients[g->player_north].game_id = -1;
+
+    // libérer la partie
+    g->used = 0;
+}
+
+
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
 {
     Client *c = &clients[idx];
@@ -262,6 +296,8 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
         handle_move(clients, idx, buffer + 6);
     } else if (strncmp(buffer, "/stats", 6) == 0) {
         handle_stats(clients);
+    } else if (strncmp(buffer, "/resign", 7) == 0) {
+        handle_resign(clients, idx);
     } else if (strncmp(buffer, "/help", 5) == 0) {
         char msg[BUF_SIZE];
         snprintf(msg, sizeof msg,
