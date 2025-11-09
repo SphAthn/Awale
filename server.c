@@ -153,14 +153,18 @@ void load_stats(const char *filename) {
     if (!f) return; // fichier inexistant → stats vides
 
     stats_count = 0;
-    while (fscanf(f, "%s %d %d %d %d",
-                  stats[stats_count].name,
-                  &stats[stats_count].games_played,
-                  &stats[stats_count].wins,
-                  &stats[stats_count].draws,
-                  &stats[stats_count].losses) == 5) {
-        stats_count++;
-        if (stats_count >= MAX_STATS) break;
+    char line[BUF_SIZE];
+    while (fgets(line, sizeof(line), f)) {
+        if (line[0] == '#') continue; // ignorer les commentaires
+        if (sscanf(line, "%s %d %d %d %d",
+                   stats[stats_count].name,
+                   &stats[stats_count].games_played,
+                   &stats[stats_count].wins,
+                   &stats[stats_count].draws,
+                   &stats[stats_count].losses) == 5) {
+            stats_count++;
+            if (stats_count >= MAX_STATS) break;
+        }
     }
     fclose(f);
 }
