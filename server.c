@@ -100,6 +100,17 @@ static void app(void)
          strncpy(c.name, buffer, BUF_SIZE - 1);
          clients[actual] = c;
          actual++;
+
+         /* Welcome message */
+         char welcome[BUF_SIZE];
+         snprintf(welcome, sizeof(welcome),
+            "Hi %s!\n"
+            "Welcome to the Awale server!\n"
+            "Type /help to see available commands.\n"
+            "Start by typing /list to see who’s online.\n\n",
+            c.name);
+         write_client(c.sock, welcome);
+
       }
       else
       {
@@ -179,7 +190,7 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
             "/challenge <user>  - Challenge another player" CRLF
             "/accept <user>     - Accept a challenge" CRLF
             "/refuse <user>     - Refuse a challenge" CRLF
-            "/move <n>          - Play a move (depending on the game)" CRLF
+            "/move <n>          - Play a move <1-6> (in a game)" CRLF
             "/help              - Show this help message" CRLF);
         write_client(c->sock, msg);
     } else {
@@ -329,8 +340,10 @@ void handle_accept(Client *clients, int idx, int actual, const char *challenger_
 
    /* Annonce de la partie */
    snprintf(msg, sizeof msg,
-            "Game %d created between %s and %s" CRLF,
+            "Game %d created between %s and %s\r\n" CRLF,
             game_id, clients[idx].name, clients[j].name);
+   snprintf(msg, sizeof msg,
+            "Play with /move <n>, where n is 1-6 on your side (left to right)." CRLF);
    write_client(clients[idx].sock, msg);
    write_client(clients[j].sock, msg);
 
@@ -384,7 +397,6 @@ void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
 
 static void handle_move(Client *clients, int idx, const char *arg)
 {
-    int pit = atoi(arg);
     Client *c = &clients[idx];
 
     if (c->state != STATE_PLAYING || c->game_id < 0) {
@@ -393,6 +405,7 @@ static void handle_move(Client *clients, int idx, const char *arg)
     }
 
     Game *g = &games[c->game_id];
+    Awale *jeu = &g->awale;
 
     // déterminer si idx est South ou North
     int player_role;
@@ -404,37 +417,61 @@ static void handle_move(Client *clients, int idx, const char *arg)
     }
 
     // vérifier que c'est son tour
-    if (g->awale.tour_de != player_role) {
+    if (jeu->tour_de != player_role) {
         write_client(c->sock, "Not your turn.\n");
         return;
     }
 
-    if (!coup_valide(&g->awale, pit)) {
-        write_client(c->sock, "Invalid move.\n");
+    // lire le numéro de case (1 à 6 attendu)
+    int n = atoi(arg);
+    if (n < 1 || n > 6) {
+        write_client(c->sock,
+            "Invalid move. Use: /move <1-6>\n"
+            "South plays on pits 1 to 6 (left to right).\n"
+            "North plays on pits 1 to 6 (left to right).\n");
         return;
     }
 
-    jouer_coup(&g->awale, pit);
-    verifier_statut(&g->awale);
+    // convertir 1–6 vers l’indice réel 0–11
+    int pit;
+    if (player_role == PLAYER_SOUTH)
+        pit = n - 1;       // 1 → 0, 6 → 5
+    else
+        pit = 12 - n;      // 1 → 11, 6 → 6
 
-    // envoyer le plateau à tout le monde
-    char board[BUF_SIZE];
-    awale_format_board(&g->awale, board, sizeof(board));
-    write_client(clients[g->player_south].sock, board);
-    write_client(clients[g->player_north].sock, board);
+    // vérifier la validité du coup
+    if (!coup_valide(jeu, pit)) {
+        write_client(c->sock, "Invalid move for current board.\n");
+        return;
+    }
 
-    if (g->awale.statut != EN_COURS) {
-        // annoncer le résultat, libérer la partie
-        char msg[BUF_SIZE];
-        if (g->awale.statut == SUD_GAGNE) {
-            snprintf(msg, sizeof(msg), "Game over. South wins.\n");
-        } else if (g->awale.statut == NORD_GAGNE) {
-            snprintf(msg, sizeof(msg), "Game over. North wins.\n");
-        } else {
-            snprintf(msg, sizeof(msg), "Game over. Draw.\n");
-        }
-        write_client(clients[g->player_south].sock, msg);
-        write_client(clients[g->player_north].sock, msg);
+    // exécuter le coup
+    jouer_coup(jeu, pit);
+    verifier_statut(jeu);
+
+    // informer les joueurs
+    char msg[BUF_SIZE];
+    snprintf(msg, sizeof(msg), "%s played pit %d.\n", c->name, n);
+    write_client(clients[g->player_south].sock, msg);
+    write_client(clients[g->player_north].sock, msg);
+
+    // afficher le plateau mis à jour
+    awale_format_board(jeu, msg, sizeof(msg));
+    write_client(clients[g->player_south].sock, msg);
+    write_client(clients[g->player_north].sock, msg);
+
+    // vérifier fin de partie
+    if (jeu->statut != EN_COURS) {
+        char endmsg[BUF_SIZE];
+        if (jeu->statut == SUD_GAGNE)
+            snprintf(endmsg, sizeof(endmsg), "Game over! South wins.\n");
+        else if (jeu->statut == NORD_GAGNE)
+            snprintf(endmsg, sizeof(endmsg), "Game over! North wins.\n");
+        else
+            snprintf(endmsg, sizeof(endmsg), "Game over! Draw.\n");
+
+        write_client(clients[g->player_south].sock, endmsg);
+        write_client(clients[g->player_north].sock, endmsg);
 
         // remettre les états clients
         clients[g->player_south].state = STATE_FREE;
@@ -442,18 +479,18 @@ static void handle_move(Client *clients, int idx, const char *arg)
         clients[g->player_north].state = STATE_FREE;
         clients[g->player_north].game_id = -1;
 
-        g->used = 0; // slot libéré
+        g->used = 0; // libère la partie
     } else {
         // indiquer de qui est le tour
-        char turn_msg[64];
-        const char *who = (g->awale.tour_de == PLAYER_SOUTH)
-                          ? clients[g->player_south].name
-                          : clients[g->player_north].name;
-        snprintf(turn_msg, sizeof(turn_msg), "Turn: %s\n", who);
-        write_client(clients[g->player_south].sock, turn_msg);
-        write_client(clients[g->player_north].sock, turn_msg);
+        const char *who = (jeu->tour_de == PLAYER_SOUTH)
+                            ? clients[g->player_south].name
+                            : clients[g->player_north].name;
+        snprintf(msg, sizeof(msg), "Turn: %s\n", who);
+        write_client(clients[g->player_south].sock, msg);
+        write_client(clients[g->player_north].sock, msg);
     }
 }
+
 
 static void clear_clients(Client *clients, int actual)
 {
