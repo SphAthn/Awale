@@ -58,7 +58,6 @@ static void send_message_to_all_clients(Client *clients, Client client, int actu
 static void remove_client(Client *clients, int to_remove, int *actual);
 static void clear_clients(Client *clients, int actual);
 
-/* Forward declarations for helpers defined later in server.c (static) */
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer);
 static void send_user_list(Client *clients, int idx, int actual);
 static void handle_challenge(Client *clients, int idx, int actual, const char *target_name);
@@ -66,5 +65,10 @@ static void handle_accept(Client *clients, int idx, int actual, const char *from
 static void handle_refuse(Client *clients, int idx, int actual, const char *from_name);
 static void handle_move(Client *clients, int idx, const char *move_args);
 static void handle_games(Client *clients, int idx);
+
+void save_stats(const char *filename);
+void load_stats(const char *filename);
+void handle_stats(Client *c);
+
 
 #endif /* guard */

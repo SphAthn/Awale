@@ -581,7 +581,7 @@ static void handle_move(Client *clients, int idx, const char *arg)
     Awale *jeu = &g->awale;
 
     // déterminer si idx est South ou North
-    int player_role;
+    JoueurID player_role;
     if (g->player_south == idx) player_role = PLAYER_SOUTH;
     else if (g->player_north == idx) player_role = PLAYER_NORTH;
     else {
