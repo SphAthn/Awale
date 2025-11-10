@@ -41,7 +41,8 @@ typedef enum
 {
     STATE_FREE,    // pas en partie
     STATE_WAITING, // a lancé un défi, attend réponse
-    STATE_PLAYING  // en train de jouer une partie
+    STATE_PLAYING,  // en train de jouer une partie
+    STATE_OBSERVING // en train d'observer une partie
 } ClientState;
 
 typedef struct

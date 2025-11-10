@@ -143,7 +143,6 @@ static void app(void)
                 /* a client is talking */
                 if (FD_ISSET(clients[i].sock, &rdfs))
                 {
-                    Client client = clients[i];
                     int c = read_client(clients[i].sock, buffer);
                     /* client disconnected */
                     if (c == 0)
@@ -288,7 +287,18 @@ static int find_client_by_name(Client *clients, int actual, const char *name)
     return -1;
 }
 
-static void handle_resign(Client *clients, int idx)
+static void send_to_observers(Client *clients, int actual, int game_id, const char *message)
+{
+    for (int i = 0; i < actual; i++)
+    {
+        if (clients[i].state == STATE_OBSERVING && clients[i].game_id == game_id)
+        {
+            write_client(clients[i].sock, message);
+        }
+    }
+}
+
+static void handle_resign(Client *clients, int idx, int actual)
 {
     Client *c = &clients[idx];
 
@@ -299,12 +309,18 @@ static void handle_resign(Client *clients, int idx)
     }
 
     Game *g = &games[c->game_id];
+    int game_id = c->game_id;
     int opponent_idx = (g->player_south == idx) ? g->player_north : g->player_south;
 
     char msg[BUF_SIZE];
     snprintf(msg, sizeof msg, "%s resigned. You win!\n", c->name);
     write_client(clients[opponent_idx].sock, msg);
     write_client(c->sock, "You resigned. Game over.\n");
+    
+    // Notifier les observateurs
+    char obs_msg[BUF_SIZE];
+    snprintf(obs_msg, sizeof obs_msg, "Game over! %s resigned.\n", c->name);
+    send_to_observers(clients, actual, game_id, obs_msg);
 
     // mettre à jour les stats
     int result = (g->player_south == idx) ? 2 : 1; // l’autre gagne
@@ -318,8 +334,90 @@ static void handle_resign(Client *clients, int idx)
     clients[g->player_north].state = STATE_FREE;
     clients[g->player_north].game_id = -1;
 
+    // libérer les observateurs
+    for (int i = 0; i < actual; i++)
+    {
+        if (clients[i].state == STATE_OBSERVING && clients[i].game_id == game_id)
+        {
+            clients[i].state = STATE_FREE;
+            clients[i].game_id = -1;
+            write_client(clients[i].sock, "The game you were observing has ended.\n");
+        }
+    }
+
     // libérer la partie
     g->used = 0;
+}
+
+static void handle_observe(Client *clients, int idx, const char *game_id_str)
+{
+    Client *c = &clients[idx];
+
+    // Trim newline
+    char cleaned[BUF_SIZE];
+    strncpy(cleaned, game_id_str, BUF_SIZE - 1);
+    cleaned[BUF_SIZE - 1] = '\0';
+    trim_newline(cleaned);
+
+    // Check if user is free
+    if (c->state != STATE_FREE)
+    {
+        write_client(c->sock, "You must be free to observe a game.\n");
+        return;
+    }
+
+    // Parse game ID
+    int gid = atoi(cleaned);
+    if (gid < 0 || gid >= MAX_GAMES)
+    {
+        write_client(c->sock, "Invalid game ID. Use /games to see active games.\n");
+        return;
+    }
+
+    // Check if game exists and is active
+    if (!games[gid].used)
+    {
+        write_client(c->sock, "This game is not active.\n");
+        return;
+    }
+
+    // Set observer state
+    c->state = STATE_OBSERVING;
+    c->game_id = gid;
+
+    char msg[BUF_SIZE];
+    snprintf(msg, sizeof(msg), "You are now observing game %d.\n", gid);
+    write_client(c->sock, msg);
+
+    // Show current game state
+    Game *g = &games[gid];
+    snprintf(msg, sizeof(msg), "Game %d: South=%s vs North=%s\n",
+             gid, clients[g->player_south].name, clients[g->player_north].name);
+    write_client(c->sock, msg);
+
+    awale_format_board(&g->awale, msg, sizeof(msg));
+    write_client(c->sock, msg);
+
+    const char *who = (g->awale.tour_de == PLAYER_SOUTH)
+                          ? clients[g->player_south].name
+                          : clients[g->player_north].name;
+    snprintf(msg, sizeof(msg), "Turn: %s\n", who);
+    write_client(c->sock, msg);
+}
+
+static void handle_unobserve(Client *clients, int idx)
+{
+    Client *c = &clients[idx];
+
+    if (c->state != STATE_OBSERVING)
+    {
+        write_client(c->sock, "You are not observing any game.\n");
+        return;
+    }
+
+    c->state = STATE_FREE;
+    c->game_id = -1;
+    write_client(c->sock, "You stopped observing.\n");
 }
 
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
@@ -355,7 +453,7 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
     }
     else if (strncmp(buffer, "/move ", 6) == 0)
     {
-        handle_move(clients, idx, buffer + 6);
+        handle_move(clients, idx, actual, buffer + 6);
     }
     else if (strncmp(buffer, "/stats", 6) == 0)
     {
@@ -363,7 +461,15 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
     }
     else if (strncmp(buffer, "/resign", 7) == 0)
     {
-        handle_resign(clients, idx);
+        handle_resign(clients, idx, actual);
+    }
+    else if (strncmp(buffer, "/observe ", 9) == 0)
+    {
+        handle_observe(clients, idx, buffer + 9);
+    }
+    else if (strncmp(buffer, "/unobserve", 10) == 0)
+    {
+        handle_unobserve(clients, idx);
     }
     else if (strncmp(buffer, "/help", 5) == 0)
     {
@@ -376,6 +482,10 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
                  "/accept <user>     - Accept a challenge" CRLF
                  "/refuse <user>     - Refuse a challenge" CRLF
                  "/move <n>          - Play a move <1-6> (in a game)" CRLF
+                 "/observe <game_id> - Observe a game" CRLF
+                 "/unobserve         - Stop observing" CRLF
+                 "/stats             - Show player statistics" CRLF
+                 "/resign            - Resign from current game" CRLF
                  "/help              - Show this help message" CRLF);
         write_client(c->sock, msg);
     }
@@ -492,6 +602,9 @@ static void send_user_list(Client *clients, int idx, int actual)
             break;
         case STATE_PLAYING:
             state_str = "playing";
+            break;
+        case STATE_OBSERVING:
+            state_str = "observing";
             break;
         default:
             state_str = "unknown";
@@ -673,7 +786,7 @@ void handle_refuse(Client *clients, int idx, int actual, const char *from_name)
     clients[j].state = STATE_FREE;
 }
 
-static void handle_move(Client *clients, int idx, const char *arg)
+static void handle_move(Client *clients, int idx, int actual, const char *arg)
 {
     Client *c = &clients[idx];
 
@@ -685,6 +798,7 @@ static void handle_move(Client *clients, int idx, const char *arg)
 
     Game *g = &games[c->game_id];
     Awale *jeu = &g->awale;
+    int game_id = c->game_id;
 
     // déterminer si idx est South ou North
     JoueurID player_role;
@@ -734,16 +848,18 @@ static void handle_move(Client *clients, int idx, const char *arg)
     jouer_coup(jeu, pit);
     verifier_statut(jeu);
 
-    // informer les joueurs
+    // informer les joueurs et les observateurs
     char msg[BUF_SIZE];
     snprintf(msg, sizeof(msg), "%s played pit %d.\n", c->name, n);
     write_client(clients[g->player_south].sock, msg);
     write_client(clients[g->player_north].sock, msg);
+    send_to_observers(clients, actual, game_id, msg);
 
     // afficher le plateau mis à jour
     awale_format_board(jeu, msg, sizeof(msg));
     write_client(clients[g->player_south].sock, msg);
     write_client(clients[g->player_north].sock, msg);
+    send_to_observers(clients, actual, game_id, msg);
 
     // vérifier fin de partie
     if (jeu->statut != EN_COURS)
@@ -758,6 +874,7 @@ static void handle_move(Client *clients, int idx, const char *arg)
 
         write_client(clients[g->player_south].sock, endmsg);
         write_client(clients[g->player_north].sock, endmsg);
+        send_to_observers(clients, actual, game_id, endmsg);
 
         // mise à jour des statistiques en fin de partie
         int result = 0;
@@ -773,6 +890,17 @@ static void handle_move(Client *clients, int idx, const char *arg)
         clients[g->player_north].state = STATE_FREE;
         clients[g->player_north].game_id = -1;
 
+        // libérer les observateurs
+        for (int i = 0; i < actual; i++)
+        {
+            if (clients[i].state == STATE_OBSERVING && clients[i].game_id == game_id)
+            {
+                clients[i].state = STATE_FREE;
+                clients[i].game_id = -1;
+                write_client(clients[i].sock, "The game you were observing has ended.\n");
+            }
+        }
+
         g->used = 0; // libère la partie
     }
     else
@@ -784,6 +912,7 @@ static void handle_move(Client *clients, int idx, const char *arg)
         snprintf(msg, sizeof(msg), "Turn: %s\n", who);
         write_client(clients[g->player_south].sock, msg);
         write_client(clients[g->player_north].sock, msg);
+        send_to_observers(clients, actual, game_id, msg);
     }
 }
 

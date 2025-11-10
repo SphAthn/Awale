@@ -63,7 +63,10 @@ static void send_user_list(Client *clients, int idx, int actual);
 static void handle_challenge(Client *clients, int idx, int actual, const char *target_name);
 static void handle_accept(Client *clients, int idx, int actual, const char *from_name);
 static void handle_refuse(Client *clients, int idx, int actual, const char *from_name);
-static void handle_move(Client *clients, int idx, const char *move_args);
+static void handle_observe(Client *clients, int idx, const char *game_id);
+static void handle_unobserve(Client *clients, int idx);
+static void handle_move(Client *clients, int idx, int actual, const char *move_args);
+static void handle_resign(Client *clients, int idx, int actual);
 static void handle_games(Client *clients, int idx);
 
 void save_stats(const char *filename);
