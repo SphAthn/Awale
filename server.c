@@ -353,10 +353,13 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
                  "Available commands:" CRLF
                  "/list              - Show connected users" CRLF
                  "/games             - List active games" CRLF
+                 "/stats             - Show your statistics and top players" CRLF
                  "/challenge <user>  - Challenge another player" CRLF
                  "/accept <user>     - Accept a challenge" CRLF
                  "/refuse <user>     - Refuse a challenge" CRLF
-                 "/move <n>          - Play a move <1-6> (in a game)" CRLF
+                 "In a game:" CRLF
+                 "/move <n>          - Play a move <1-6>" CRLF
+                 "/resign            - Resign from the current game" CRLF
                  "/help              - Show this help message" CRLF);
         write_client(c->sock, msg);
     }
