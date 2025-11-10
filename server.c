@@ -420,6 +420,33 @@ static void handle_unobserve(Client *clients, int idx)
     write_client(c->sock, "You stopped observing.\n");
 }
 
+static void handle_demo(Client *clients, int idx, int actual)
+{
+    Client *c = &clients[idx];
+    
+    if (c->state != STATE_PLAYING || c->game_id < 0) {
+        write_client(c->sock, "You must be in a game to use /demo.\n");
+        return;
+    }
+    
+    Game *g = &games[c->game_id];
+    
+    configurer_plateau_demo(&g->awale);
+    
+    char msg[BUF_SIZE];
+    snprintf(msg, sizeof(msg), 
+             "Demo mode activated! Board configured for quick finish.\n");
+    write_client(clients[g->player_south].sock, msg);
+    write_client(clients[g->player_north].sock, msg);
+    
+    send_to_observers(clients, actual, c->game_id, msg);
+    
+    awale_format_board(&g->awale, msg, sizeof(msg));
+    write_client(clients[g->player_south].sock, msg);
+    write_client(clients[g->player_north].sock, msg);
+    send_to_observers(clients, actual, c->game_id, msg);
+}
+
 static void handle_client_message(Client *clients, int idx, int actual, char *buffer)
 {
     Client *c = &clients[idx];
@@ -470,6 +497,10 @@ static void handle_client_message(Client *clients, int idx, int actual, char *bu
     else if (strncmp(buffer, "/unobserve", 10) == 0)
     {
         handle_unobserve(clients, idx);
+    }
+    else if (strncmp(buffer, "/demo", 5) == 0)
+    {
+        handle_demo(clients, idx, actual);
     }
     else if (strncmp(buffer, "/help", 5) == 0)
     {

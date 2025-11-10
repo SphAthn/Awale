@@ -8,7 +8,7 @@ LDFLAGS ?=
 SERVER  := server
 CLIENT  := client
 
-# Sources explicites (on ne compile PAS game.c)
+# Sources explicites
 SERVER_SRCS := server.c awale.c
 CLIENT_SRCS := client.c
 
@@ -29,13 +29,6 @@ $(CLIENT): $(CLIENT_OBJS)
 # Compilation de chaque .c en .o
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-# Lancer rapidement (à adapter à tes besoins)
-run-server: $(SERVER)
-	./$(SERVER)
-
-run-client: $(CLIENT)
-	./$(CLIENT)
 
 # Nettoyage
 clean:

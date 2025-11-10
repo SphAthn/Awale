@@ -6,6 +6,7 @@ typedef enum
     PLAYER_SOUTH = 0,
     PLAYER_NORTH = 1
 } JoueurID;
+
 typedef enum
 {
     EN_COURS = 0,
@@ -38,5 +39,6 @@ int coup_valide(const Awale *jeu, int pit);
 void jouer_coup(Awale *jeu, int pit);
 void verifier_statut(Awale *jeu);
 void awale_format_board(const Awale *jeu, char *out, size_t out_size);
+void configurer_plateau_demo(Awale *jeu);
 
 #endif

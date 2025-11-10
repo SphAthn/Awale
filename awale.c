@@ -140,3 +140,25 @@ void awale_format_board(const Awale *jeu, char *out, size_t out_size)
              jeu->captures[PLAYER_SOUTH], jeu->captures[PLAYER_NORTH]);
     strncat(out, tmp, out_size - strlen(out) - 1);
 }
+
+void configurer_plateau_demo(Awale *jeu) {
+    jeu->plateau[0] = 0;
+    jeu->plateau[1] = 0;
+    jeu->plateau[2] = 5;
+    jeu->plateau[3] = 0;
+    jeu->plateau[4] = 0;
+    jeu->plateau[5] = 0;
+    
+    jeu->plateau[6] = 2;
+    jeu->plateau[7] = 2;
+    jeu->plateau[8] = 0;
+    jeu->plateau[9] = 1;
+    jeu->plateau[10] = 1;
+    jeu->plateau[11] = 1;
+    
+    jeu->captures[PLAYER_SOUTH] = 23;
+    jeu->captures[PLAYER_NORTH] = 20;
+    jeu->tour_de = PLAYER_SOUTH;
+    jeu->nombre_tours = 50;
+    jeu->statut = EN_COURS;
+}

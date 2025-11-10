@@ -1,6 +1,7 @@
 Alice 10 6 2 2
 Bob 8 3 1 4
 Charlie 15 7 3 5
-louis 3 0 0 3
-hugo 1 1 0 0
+louis 5 1 0 4
+hugo 2 2 0 0
 pilou 2 2 0 0
+sophie 1 0 0 1
