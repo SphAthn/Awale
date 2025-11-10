@@ -11,8 +11,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h> /* close */
-#include <netdb.h> /* gethostbyname */
+#include <unistd.h>     /* close */
+#include <netdb.h>      /* gethostbyname */
 #include <sys/select.h> /* select, fd_set, STDIN_FILENO */
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
@@ -28,8 +28,8 @@ typedef struct in_addr IN_ADDR;
 
 #endif
 
-#define CRLF     "\r\n"
-#define PORT     1977
+#define CRLF "\r\n"
+#define PORT 1977
 
 #define BUF_SIZE 1024
 
@@ -37,19 +37,21 @@ typedef struct in_addr IN_ADDR;
  * declared in this header. This header exposes the Client type used by both
  * client and server code. */
 
-typedef enum {
-    STATE_FREE,        // pas en partie
-    STATE_WAITING,     // a lancé un défi, attend réponse
-    STATE_PLAYING      // en train de jouer une partie
+typedef enum
+{
+    STATE_FREE,    // pas en partie
+    STATE_WAITING, // a lancé un défi, attend réponse
+    STATE_PLAYING  // en train de jouer une partie
 } ClientState;
 
-typedef struct {
+typedef struct
+{
     SOCKET sock;
     char name[BUF_SIZE];
 
     ClientState state;
-    int game_id;       // index dans le tableau de parties, -1 si aucune
-    int pending_with;  // index du client avec qui il a une demande en cours, -1 sinon
+    int game_id;      // index dans le tableau de parties, -1 si aucune
+    int pending_with; // index du client avec qui il a une demande en cours, -1 sinon
 } Client;
 
 #endif /* guard */

@@ -1,10 +1,21 @@
 #ifndef AWALE_H
 #define AWALE_H
 
-typedef enum { PLAYER_SOUTH = 0, PLAYER_NORTH = 1 } JoueurID;
-typedef enum { EN_COURS = 0, SUD_GAGNE, NORD_GAGNE, NUL } StatutJeu;
+typedef enum
+{
+    PLAYER_SOUTH = 0,
+    PLAYER_NORTH = 1
+} JoueurID;
+typedef enum
+{
+    EN_COURS = 0,
+    SUD_GAGNE,
+    NORD_GAGNE,
+    NUL
+} StatutJeu;
 
-typedef struct {
+typedef struct
+{
     unsigned char plateau[12];
     unsigned char captures[2];
     JoueurID tour_de;
@@ -12,12 +23,13 @@ typedef struct {
     StatutJeu statut;
 } Awale;
 
-typedef struct {
-    int used;          // 0 = libre, 1 = partie en cours
-    Awale awale;       // votre structure de jeu
+typedef struct
+{
+    int used;    // 0 = libre, 1 = partie en cours
+    Awale awale; // votre structure de jeu
 
-    int player_south;  // index dans le tableau clients[]
-    int player_north;  // index dans le tableau clients[]
+    int player_south; // index dans le tableau clients[]
+    int player_north; // index dans le tableau clients[]
 } Game;
 
 void initialiser_jeu(Awale *jeu);

@@ -11,8 +11,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <unistd.h> /* close */
-#include <netdb.h> /* gethostbyname */
+#include <unistd.h>     /* close */
+#include <netdb.h>      /* gethostbyname */
 #include <sys/select.h> /* select, fd_set, STDIN_FILENO */
 #define INVALID_SOCKET -1
 #define SOCKET_ERROR -1
@@ -22,24 +22,24 @@ typedef struct sockaddr_in SOCKADDR_IN;
 typedef struct sockaddr SOCKADDR;
 typedef struct in_addr IN_ADDR;
 
-
 #else
 
 #error not defined for this platform
 
 #endif
 
-#define CRLF        "\r\n"
-#define PORT         1977
-#define MAX_CLIENTS  100
-#define MAX_GAMES    32
+#define CRLF "\r\n"
+#define PORT 1977
+#define MAX_CLIENTS 100
+#define MAX_GAMES 32
 
-#define BUF_SIZE     1024
-#define MAX_STATS    100   // maximum number of players with stats
+#define BUF_SIZE 1024
+#define MAX_STATS 100 // maximum number of players with stats
 
 #include "client.h"
 
-typedef struct {
+typedef struct
+{
     char name[BUF_SIZE];
     int games_played;
     int wins;
@@ -69,6 +69,5 @@ static void handle_games(Client *clients, int idx);
 void save_stats(const char *filename);
 void load_stats(const char *filename);
 void handle_stats(Client *c);
-
 
 #endif /* guard */
