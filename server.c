@@ -96,6 +96,25 @@ static void app(void)
                 continue;
             }
 
+            /* check if username is already taken */
+            int username_taken = 0;
+            for (int i = 0; i < actual; i++)
+            {
+                if (strcmp(clients[i].name, buffer) == 0)
+                {
+                    username_taken = 1;
+                    break;
+                }
+            }
+
+            if (username_taken)
+            {
+                /* send error message and close connection */
+                write_client(csock, "Error: Username already taken. Please reconnect with a different name.\n");
+                closesocket(csock);
+                continue;
+            }
+
             /* what is the new maximum fd ? */
             max = csock > max ? csock : max;
 
