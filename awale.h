@@ -27,7 +27,7 @@ typedef struct
 typedef struct
 {
     int used;    // 0 = libre, 1 = partie en cours
-    Awale awale; // votre structure de jeu
+    Awale awale; // structure de jeu
 
     int player_south; // index dans le tableau clients[]
     int player_north; // index dans le tableau clients[]
